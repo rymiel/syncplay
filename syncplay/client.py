@@ -414,7 +414,8 @@ class SyncplayClient(object):
         self._lastGlobalUpdate = time.time()
         if doSeek:
             madeChangeOnPlayer = self._serverSeeked(position, setBy)
-        if diff > self._config['rewindThreshold'] and not doSeek and not self._config['rewindOnDesync'] == False:
+        rewind_threhsold = self._config['rewindThreshold'] * self._playerSpeed
+        if diff > rewind_threhsold and not doSeek and not self._config['rewindOnDesync'] == False:
             madeChangeOnPlayer = self._rewindPlayerDueToTimeDifference(position, setBy)
         if self._config['fastforwardOnDesync'] and (self.userlist.currentUser.canControl() == False or self._config['dontSlowDownWithMe'] == True):
             if diff < (constants.FASTFORWARD_BEHIND_THRESHOLD * -1) and not doSeek:
