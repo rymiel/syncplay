@@ -257,7 +257,8 @@ class SyncClientProtocol(JSONCommandProtocol):
         paused = state["playstate"]["paused"] if "paused" in state["playstate"] else None
         doSeek = state["playstate"]["doSeek"] if "doSeek" in state["playstate"] else None
         setBy = state["playstate"]["setBy"] if "setBy" in state["playstate"] else None
-        return position, paused, doSeek, setBy
+        speed = state["playstate"]["speed"] if "speed" in state["playstate"] else 1.0
+        return position, paused, doSeek, setBy, speed
 
     def _handleStatePing(self, state):
         if "latencyCalculation" in state["ping"]:
@@ -270,7 +271,7 @@ class SyncClientProtocol(JSONCommandProtocol):
         return messageAge, latencyCalculation
 
     def handleState(self, state):
-        position, paused, doSeek, setBy = None, None, None, None
+        position, paused, doSeek, setBy, speed = None, None, None, None, None
         messageAge = 0
         if not self.hadFirstStateUpdate:
             self.hadFirstStateUpdate = True
@@ -283,15 +284,15 @@ class SyncClientProtocol(JSONCommandProtocol):
                 if(ignore['client']) == self.clientIgnoringOnTheFly:
                     self.clientIgnoringOnTheFly = 0
         if "playstate" in state:
-            position, paused, doSeek, setBy = self._extractStatePlaystateArguments(state)
+            position, paused, doSeek, setBy, speed = self._extractStatePlaystateArguments(state)
         if "ping" in state:
             messageAge, latencyCalculation = self._handleStatePing(state)
         if position is not None and paused is not None and not self.clientIgnoringOnTheFly:
             self._client.updateGlobalState(position, paused, doSeek, setBy, messageAge)
-        position, paused, doSeek, stateChange = self._client.getLocalState()
-        self.sendState(position, paused, doSeek, latencyCalculation, stateChange)
+        position, paused, doSeek, stateChange, speed = self._client.getLocalState()
+        self.sendState(position, paused, doSeek, latencyCalculation, stateChange, speed)
 
-    def sendState(self, position, paused, doSeek, latencyCalculation, stateChange=False):
+    def sendState(self, position, paused, doSeek, latencyCalculation, stateChange=False, speed=1.0):
         state = {}
         positionAndPausedIsSet = position is not None and paused is not None
         clientIgnoreIsNotSet = self.clientIgnoringOnTheFly == 0 or self.serverIgnoringOnTheFly != 0
@@ -299,6 +300,7 @@ class SyncClientProtocol(JSONCommandProtocol):
             state["playstate"] = {}
             state["playstate"]["position"] = position
             state["playstate"]["paused"] = paused
+            state["playstate"]["speed"] = speed
             if doSeek:
                 state["playstate"]["doSeek"] = doSeek
         state["ping"] = {}
@@ -439,7 +441,8 @@ class SyncServerProtocol(JSONCommandProtocol):
         return wrapper
 
     def showDebugMessage(self, line):
-        pass
+        username = self._watcher.getName() if self._watcher else "???"
+        print(f"[{username}] {line}")
 
     def dropWithError(self, error):
         print(getMessage("client-drop-server-error").format(self.transport.getPeer().host, error))

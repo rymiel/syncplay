@@ -244,6 +244,16 @@ class MpvPlayer(BasePlayer):
             self._paused = self._client.getGlobalPaused()
             #self._client.ui.showDebugMessage("STORING GLOBAL PAUSED AS FILE IS NOT LOADED")
 
+    def _storeSpeedState(self, value):
+        if value is None:
+            self._client.ui.showDebugMessage("NONE TYPE SPEED STATE!")
+            return
+        if self._fileIsLoaded():
+            self._speed = value
+            #self._client.ui.showDebugMessage("PAUSE STATE STORED AS {}".format(self._paused))
+        else:
+            self._speed = 1.0
+            #self._client.ui.showDebugMessage("STORING GLOBAL PAUSED AS FILE IS NOT LOADED")
 
     def lineReceived(self, line):
         if line:
@@ -306,11 +316,13 @@ class MpvPlayer(BasePlayer):
             self._client.ui.showDebugMessage("mpv not ready for update")
             return
 
-        self._getPausedAndPosition()
+        # self._getPausedAndPosition()
+        self._getPausedPositionSpeed()
         self._positionAsk.wait(constants.MPV_LOCK_WAIT_TIME)
         self._pausedAsk.wait(constants.MPV_LOCK_WAIT_TIME)
+        self._speedAsk.wait(constants.MPV_LOCK_WAIT_TIME)
         self._client.updatePlayerStatus(
-            self._paused if self.fileLoaded else self._client.getGlobalPaused(), self.getCalculatedPosition())
+            self._paused if self.fileLoaded else self._client.getGlobalPaused(), self.getCalculatedPosition(), self._speed)
 
     def drop(self):
         try:
@@ -327,12 +339,16 @@ class MpvPlayer(BasePlayer):
             self._pathAsk.set()
             self._positionAsk.set()
             self._pausedAsk.set()
+            self._speedAsk.set()
         except:
             pass
 
 
     def _getPausedAndPosition(self):
         self._listener.sendLine(["script-message-to", "syncplayintf", "get_paused_and_position"])
+
+    def _getPausedPositionSpeed(self):
+        self._listener.sendLine(["script-message-to", "syncplayintf", "get_paused_position_speed"])
 
     def _getPaused(self):
         self._getProperty('pause')
@@ -446,6 +462,13 @@ class MpvPlayer(BasePlayer):
             else:
                 self._storePosition(float(position_update))
             self._positionAsk.set()
+            if ", speed=" in line:
+                speed_update = update_string[6]
+                if paused_update == "nil":
+                    self._storeSpeedState(1.0)
+                else:
+                    self._storeSpeedState(float(speed_update))
+                self._speedAsk.set()
             #self._client.ui.showDebugMessage("{} = {} / {}".format(update_string, paused_update, position_update))
 
         if "<get_syncplayintf_options>" in line:
@@ -520,6 +543,7 @@ class MpvPlayer(BasePlayer):
     def _set_defaults(self):
         self._paused = None
         self._position = 0.0
+        self._speed = 1.0
         self._duration = None
         self._filename = None
         self._filepath = None
@@ -548,6 +572,7 @@ class MpvPlayer(BasePlayer):
 
         self._positionAsk = threading.Event()
         self._pausedAsk = threading.Event()
+        self._speedAsk = threading.Event()
 
         self._preparePlayer()
 

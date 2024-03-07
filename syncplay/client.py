@@ -118,6 +118,7 @@ class SyncplayClient(object):
         self._lastPlayerUpdate = None
         self._playerPosition = 0.0
         self._playerPaused = True
+        self._playerSpeed = 1.0
 
         self._lastGlobalUpdate = None
         self._globalPosition = 0.0
@@ -221,12 +222,14 @@ class SyncplayClient(object):
     def seamlessMusicOveride(self):
         return self.isPlayingMusic() and self._recentlyAdvanced()
 
-    def updatePlayerStatus(self, paused, position):
+    def updatePlayerStatus(self, paused, position, speed=1.0):
         position -= self.getUserOffset()
         pauseChange, seeked = self._determinePlayerStateChange(paused, position)
         positionBeforeSeek = self._playerPosition
         self._playerPosition = position
         self._playerPaused = paused
+        if not self._speedChanged:
+          self._playerSpeed = speed
         currentLength = self.userlist.currentUser.file["duration"] if self.userlist.currentUser.file else 0
         if (
             pauseChange and paused and currentLength > constants.PLAYLIST_LOAD_NEXT_FILE_MINIMUM_LENGTH
@@ -316,9 +319,9 @@ class SyncplayClient(object):
             position = self.getPlayerPosition()
         pauseChange, _ = self._determinePlayerStateChange(paused, position)
         if self._lastGlobalUpdate:
-            return position, paused, _, pauseChange
+            return position, paused, _, pauseChange, self.getPlayerSpeed()
         else:
-            return None, None, None, None
+            return None, None, None, None, None
 
     def _initPlayerState(self, position, paused):
         if self.userlist.currentUser.file:
@@ -383,16 +386,18 @@ class SyncplayClient(object):
     def _slowDownToCoverTimeDifference(self, diff, setBy):
         hideFromOSD = not constants.SHOW_SLOWDOWN_OSD
         madeChangeOnPlayer = False
-        if self._config['slowdownThreshold'] < diff and not self._speedChanged:
+        threshold = self._config['slowdownThreshold'] * self._playerSpeed
+        self.ui.showDebugMessage(f"Slowdown check: {diff} < {threshold}, set by {setBy}")
+        if threshold < diff and not self._speedChanged:
             if self.getUsername() == setBy:
                 self.ui.showDebugMessage("Caught attempt to slow down due to time difference with self")
             else:
-                self._player.setSpeed(constants.SLOWDOWN_RATE)
+                self._player.setSpeed(self._playerSpeed * constants.SLOWDOWN_RATE)
                 self._speedChanged = True
                 self.ui.showMessage(getMessage("slowdown-notification").format(setBy), hideFromOSD)
                 madeChangeOnPlayer = True
         elif self._speedChanged and diff < constants.SLOWDOWN_RESET_THRESHOLD:
-            self._player.setSpeed(1.00)
+            self._player.setSpeed(self._playerSpeed)
             self._speedChanged = False
             self.ui.showMessage(getMessage("revert-notification"), hideFromOSD)
             madeChangeOnPlayer = True
@@ -489,6 +494,11 @@ class SyncplayClient(object):
             else:
                 return True
         return self._playerPaused
+
+    def getPlayerSpeed(self):
+        if not self._lastPlayerUpdate:
+            return 1.0
+        return self._playerSpeed
 
     def getGlobalPosition(self):
         if not self._lastGlobalUpdate:
