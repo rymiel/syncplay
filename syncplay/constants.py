@@ -361,3 +361,7 @@ CONSOLE_UI_MODE = "CLI"
 GRAPHICAL_UI_MODE = "GUI"
 UNKNOWN_UI_MODE = "Unknown"
 FALLBACK_ASSUMED_UI_MODE = GRAPHICAL_UI_MODE
+
+# hacks
+CHAT_SPEED_CHANGE_PATTERN = r"<speed=(\d+)>"
+CHAT_SPEED_INTEGER_MULTIPLIER = 100 # apparently otherwise mpv rounds it and does weird desync stuff

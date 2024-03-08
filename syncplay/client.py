@@ -228,8 +228,11 @@ class SyncplayClient(object):
         positionBeforeSeek = self._playerPosition
         self._playerPosition = position
         self._playerPaused = paused
+        prev_player_speed = self._playerSpeed
         if not self._speedChanged:
           self._playerSpeed = speed
+          if speed != prev_player_speed:
+              self.sendChat(f"<speed={int(speed * constants.CHAT_SPEED_INTEGER_MULTIPLIER)}>")
         currentLength = self.userlist.currentUser.file["duration"] if self.userlist.currentUser.file else 0
         if (
             pauseChange and paused and currentLength > constants.PLAYLIST_LOAD_NEXT_FILE_MINIMUM_LENGTH
@@ -1666,6 +1669,27 @@ class UiManager(object):
 
     def showChatMessage(self, username, userMessage):
         messageString = "<{}> {}".format(username, userMessage)
+        speed_change = re.match(constants.CHAT_SPEED_CHANGE_PATTERN, userMessage)
+        change_speed_to = None
+        if speed_change:
+            try:
+                change_speed_to = int(speed_change.group(1)) / constants.CHAT_SPEED_INTEGER_MULTIPLIER
+                self.showDebugMessage(f"!! {self._client.getUsername()}: Speed change request from {username}, set to {change_speed_to}")
+            except:
+                pass
+
+        if username == self._client.getUsername():
+            change_speed_to = None
+
+        self.showDebugMessage(f"!! set speed to {change_speed_to}")
+
+        if speed_change and change_speed_to:
+            self._client._player.setSpeed(change_speed_to)
+            self._client._playerSpeed = change_speed_to
+            self.showOSDMessage(f"{username} set the speed to {change_speed_to}", 2, OSDType=constants.OSD_ALERT, mood=constants.MESSAGE_GOODNEWS)
+        if speed_change:
+            return
+
         if self._client._player.chatOSDSupported and self._client._config["chatOutputEnabled"]:
             self._client._player.displayChatMessage(username, userMessage)
         else:
