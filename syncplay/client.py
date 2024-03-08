@@ -125,6 +125,7 @@ class SyncplayClient(object):
         self._globalPaused = 0.0
         self._userOffset = 0.0
         self._speedChanged = False
+        self._speed_locked_to = 1.0
         self.behindFirstDetected = None
         self.autoPlay = False
         self.autoPlayThreshold = None
@@ -229,8 +230,9 @@ class SyncplayClient(object):
         self._playerPosition = position
         self._playerPaused = paused
         prev_player_speed = self._playerSpeed
-        if not self._speedChanged:
+        if (not self._speedChanged) or (self._speedChanged and speed != self._speed_locked_to):
           self._playerSpeed = speed
+          self._speedChanged = False
           if speed != prev_player_speed:
               self.sendChat(f"<speed={int(speed * constants.CHAT_SPEED_INTEGER_MULTIPLIER)}>")
         currentLength = self.userlist.currentUser.file["duration"] if self.userlist.currentUser.file else 0
@@ -395,13 +397,16 @@ class SyncplayClient(object):
             if self.getUsername() == setBy:
                 self.ui.showDebugMessage("Caught attempt to slow down due to time difference with self")
             else:
-                self._player.setSpeed(self._playerSpeed * constants.SLOWDOWN_RATE)
+                new_speed = self._playerSpeed * constants.SLOWDOWN_RATE
+                self._player.setSpeed(new_speed)
                 self._speedChanged = True
+                self._speed_locked_to = new_speed
                 self.ui.showMessage(getMessage("slowdown-notification").format(setBy), hideFromOSD)
                 madeChangeOnPlayer = True
         elif self._speedChanged and diff < constants.SLOWDOWN_RESET_THRESHOLD:
             self._player.setSpeed(self._playerSpeed)
             self._speedChanged = False
+            self._speed_locked_to = self._playerSpeed
             self.ui.showMessage(getMessage("revert-notification"), hideFromOSD)
             madeChangeOnPlayer = True
         return madeChangeOnPlayer
