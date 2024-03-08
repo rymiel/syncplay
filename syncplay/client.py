@@ -322,9 +322,9 @@ class SyncplayClient(object):
             position = self.getPlayerPosition()
         pauseChange, _ = self._determinePlayerStateChange(paused, position)
         if self._lastGlobalUpdate:
-            return position, paused, _, pauseChange, self.getPlayerSpeed()
+            return position, paused, _, pauseChange
         else:
-            return None, None, None, None, None
+            return None, None, None, None
 
     def _initPlayerState(self, position, paused):
         if self.userlist.currentUser.file:
@@ -498,11 +498,6 @@ class SyncplayClient(object):
             else:
                 return True
         return self._playerPaused
-
-    def getPlayerSpeed(self):
-        if not self._lastPlayerUpdate:
-            return 1.0
-        return self._playerSpeed
 
     def getGlobalPosition(self):
         if not self._lastGlobalUpdate:
